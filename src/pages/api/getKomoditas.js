@@ -4,7 +4,12 @@ import { promises as fs } from "fs";
 
 export default async function handler(req, res) {
   try {
-    const credentials = JSON.parse(process.env.GOOGLE_CREDENTIALS);
+    // Ambil dari ENV lalu decode base64
+    const decoded = Buffer.from(
+      process.env.GOOGLE_CREDENTIALS,
+      "base64"
+    ).toString("utf-8");
+    const credentials = JSON.parse(decoded);
 
     const auth = new google.auth.GoogleAuth({
       credentials,
