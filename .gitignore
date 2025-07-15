@@ -1,0 +1,15 @@
+# node
+node_modules
+.next
+.vercel
+
+# build
+/build
+/out
+
+# env & secrets
+.env*
+credentials.json
+
+# OS/filesystem
+.DS_Store
