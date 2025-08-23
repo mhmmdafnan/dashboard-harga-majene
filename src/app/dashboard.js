@@ -170,7 +170,7 @@ export default function Dashboard() {
 
         {/* Nilai Inflasi dll */}
         <div className="w-full flex justify-center items-center py-4">
-          <div className={`grid gap-x-20 grid-cols-${content.length}`}>
+          <div className={`grid gap-x-20 ${page? "grid-cols-2" : "grid-cols-3"}`}>
             {content.map((item, idx) => (
               <ValueContainer key={idx} title={item.title} value={item.value} />
             ))}

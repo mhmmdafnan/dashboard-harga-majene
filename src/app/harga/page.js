@@ -1,9 +1,10 @@
-import MainApp from "../dashboard.js";
+import { Suspense } from "react";
+import Dashboard from "../dashboard.js";
 
-export default function Page() {
+export default function DashboardPage() {
   return (
-    <>
-      <MainApp />
-    </>
+    <Suspense fallback={<div>Loading dashboard...</div>}>
+      <Dashboard />
+    </Suspense>
   );
 }
