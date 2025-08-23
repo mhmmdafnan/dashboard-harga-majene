@@ -1,10 +1,7 @@
 import { google } from "googleapis";
-import path from "path";
-import { promises as fs } from "fs";
 
 export default async function handler(req, res) {
   try {
-    // Ambil dari ENV lalu decode base64
     const decoded = Buffer.from(
       process.env.GOOGLE_CREDENTIALS,
       "base64"
@@ -19,13 +16,17 @@ export default async function handler(req, res) {
     const sheets = google.sheets({ version: "v4", auth });
 
     const response = await sheets.spreadsheets.values.get({
-      spreadsheetId: "1DQqrUh9ZafZpo4I00FZwXcQlPX8YL-ztQQbYz6ay4h8",
-      range: "Sheet1!A1:AB390",
+      spreadsheetId: "1R9_IijsAoi9UYZvipw7zkzyIsbCibR-R9BSUYSAcp7U",
+      range: "Sheet1!A1:AB3090",
     });
 
     const rows = response.data.values;
     if (!rows || rows.length === 0) {
-      return res.status(200).json([]);
+      return res.status(200).json({
+        komoditas: [],
+        tahun: [],
+        bulan: []
+      });
     }
 
     const headers = rows[0];
@@ -36,18 +37,14 @@ export default async function handler(req, res) {
       }, {})
     );
 
-    // Ambil semua nama unik dari kolom tersebut
-    const uniqueNames = [
-      ...new Set(
-        data.map((item) =>
-          item["Kelompok/Sub Kelompok/Komoditas Jenis Barang dan Jasa"]?.trim()
-        )
-      ),
-    ].filter(Boolean); // buang undefined/null
+    // Extract unique values
+    const komoditas = [...new Set(data.map((item) => item["Nama Komoditas"]?.trim()))].filter(Boolean);
+    const tahun = [...new Set(data.map((item) => item["Tahun"]?.trim()))].filter(Boolean);
+    const bulan = [...new Set(data.map((item) => item["Bulan"]?.trim()))].filter(Boolean);
 
-    res.status(200).json(uniqueNames);
+    res.status(200).json({ komoditas, tahun, bulan });
   } catch (error) {
-    console.error("Error fetching komoditas:", error);
+    console.error("Error fetching filters:", error);
     res.status(500).json({ message: "Server error" });
   }
 }
