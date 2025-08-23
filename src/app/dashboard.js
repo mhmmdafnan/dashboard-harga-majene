@@ -74,7 +74,8 @@ export default function Dashboard() {
   const [dataGraph, setDataGraph] = useState([]);
 
   const searchParams = useSearchParams();
-  const page = searchParams.get("page");
+  const [page, setPage] = useState(null);
+
   let titleHeader = "";
   let content = [];
   if (page === "harga") {
@@ -138,13 +139,17 @@ export default function Dashboard() {
     // console.log("Data loaded:", dataGraph);
   }, []);
 
+  useEffect(() => {
+    setPage(searchParams.get("page"));
+  }, [searchParams]);
+
   return (
     <>
       <Header />
       <div className="p-6 space-y-4 max-w-7xl min-h-screen mx-auto">
         <h1 className="text-2xl font-bold">{titleHeader}</h1>
 
-        <div className="bg-white shadow-md rounded-2xl p-6 flex space-x-4">
+        <div className="bg-white shadow-md rounded-2xl p-6 flex flex-col sm:flex-row sm:space-x-4 space-y-4 sm:space-y-0">
           <FilterSelect
             filter="Komoditas"
             options={komoditas}
@@ -170,7 +175,11 @@ export default function Dashboard() {
 
         {/* Nilai Inflasi dll */}
         <div className="w-full flex justify-center items-center py-4">
-          <div className={`grid gap-x-20 ${page? "grid-cols-2" : "grid-cols-3"}`}>
+          <div
+            className={`grid gap-x-20 ${
+              page ? "grid-cols-1 md:grid-cols-2" : "grid-cols-1 md:grid-cols-3"
+            }`}
+          >
             {content.map((item, idx) => (
               <ValueContainer key={idx} title={item.title} value={item.value} />
             ))}
