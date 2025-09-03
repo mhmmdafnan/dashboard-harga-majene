@@ -2,17 +2,31 @@
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import {
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
   Tooltip,
-  CartesianGrid,
-  ResponsiveContainer,
-} from "recharts";
+  Legend,
+} from "chart.js";
+import { Line } from "react-chartjs-2";
+
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend
+);
 import dynamic from "next/dynamic";
 import Header from "./header";
-
+const Loading = dynamic(() => import("@/components/Loading"), {
+  ssr: false,
+});
 const FilterSelect = dynamic(() => import("@/components/FilterSelect"), {
   ssr: false,
 });
@@ -21,44 +35,42 @@ const ValueContainer = dynamic(() => import("@/components/valueContainer"), {
   ssr: false,
 });
 
-// export function transformData(data) {
-//   const result = [];
+import TopAndilChart from "@/components/TopAndilInflasi";
+// import { androiddeviceprovisioning } from "googleapis/build/src/apis/androiddeviceprovisioning";
 
-//   for (const key in data) {
-//     if (/^[A-Za-z]{3}-\d{2}$/.test(key)) {
-//       const cleanValue = data[key].trim();
-//       if (cleanValue !== "-" && cleanValue !== "") {
-//         result.push({
-//           bulan: key,
-//           harga: parseFloat(cleanValue),
-//         });
-//       }
-//     }
-//   }
+export function transformAndil(data, tahun, bulan, indikator) {
+  // Filter data sesuai tahun & bulan
+  const filtered = data.filter(
+    (item) =>
+      String(item.Tahun) === String(tahun) &&
+      String(item.Bulan) === String(bulan)
+  );
 
-//   const months = {
-//     Jan: 0,
-//     Feb: 1,
-//     Mar: 2,
-//     Apr: 3,
-//     May: 4,
-//     Jun: 5,
-//     Jul: 6,
-//     Aug: 7,
-//     Sep: 8,
-//     Oct: 9,
-//     Nov: 10,
-//     Dec: 11,
-//   };
+  // Tentukan key yang dipakai berdasarkan indikator
+  let key = "";
+  if (indikator === "Inflasi MtM") {
+    key = "Andil MtM";
+  } else if (indikator === "Inflasi YoY") {
+    key = "Andil YoY";
+  } else if (indikator === "Inflasi YtD") {
+    key = "Andil YtD";
+  }
 
-//   return result.sort((a, b) => {
-//     const [ma, ya] = a.bulan.split("-");
-//     const [mb, yb] = b.bulan.split("-");
-//     return new Date(+`20${ya}`, months[ma]) - new Date(+`20${yb}`, months[mb]);
-//   });
-// }
+  // Mapping hasil
+  const mapped = filtered.map((item) => ({
+    nama: item["Nama Komoditas"],
+    andil: parseFloat(item[key]) || 0,
+  }));
+
+  // Urutkan desc & ambil top 10
+  return mapped.sort((a, b) => b.andil - a.andil).slice(0, 10);
+}
 
 export default function Dashboard() {
+  const now = new Date();
+  const currentYear = String(now.getFullYear()); // 2025
+  const currentMonth = String(now.getMonth() + 1); // 9 (ingat getMonth() mulai dari 0)
+
   const [komoditas, setKomoditas] = useState([]);
   const [valueYoY, setValueYoY] = useState();
   const [valueMtM, setValueMtM] = useState();
@@ -67,14 +79,79 @@ export default function Dashboard() {
   const [valueHarga, setValueHarga] = useState();
   const [tahun, setTahun] = useState([]);
   const [bulan, setBulan] = useState([]);
-  const [selectedKomoditas, setSelectedKomoditas] = useState();
-  const [selectedTahun, setSelectedTahun] = useState();
-  const [selectedBulan, setSelectedBulan] = useState();
+  const [selectedKomoditas, setSelectedKomoditas] = useState("UMUM");
+  const [selectedTahun, setSelectedTahun] = useState(currentYear);
+  // const [selectedBulan, setSelectedBulan] = useState(currentMonth);
+  const [selectedBulan, setSelectedBulan] = useState("7");
   const [data, setData] = useState([]);
+  const [filteredData, setFilteredData] = useState([]);
   const [dataGraph, setDataGraph] = useState([]);
 
+  const [selectedIndicator, setSelectedIndicator] = useState("Inflasi YoY");
   const searchParams = useSearchParams();
   const [page, setPage] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  // Line Chart
+  const defaultKey =
+    page === "ihk" ? "IHK" : page === "harga" ? "Harga" : "Inflasi YoY";
+
+  const dataKey = selectedIndicator || defaultKey;
+
+  const chartData = {
+    labels: dataGraph.map((d) => d.Bulan),
+    datasets: [
+      {
+        label: dataKey,
+        data: dataGraph.map((d) => Number(d[dataKey])),
+        borderColor: "#f97316", // orange-500
+        backgroundColor: "#fdba74", // orange-300
+        pointBackgroundColor: "#ea580c", // orange-600
+        pointBorderColor: "#c2410c", // orange-700
+        tension: 0.4, // bikin garis smooth
+        // fill: true, // area di bawah garis diwarnai
+      },
+    ],
+  };
+
+  const chartOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: "#fff",
+        titleColor: "#000",
+        bodyColor: "#000",
+        borderColor: "#e5e7eb",
+        borderWidth: 1,
+        padding: 10,
+        cornerRadius: 8,
+      },
+    },
+    scales: {
+      x: {
+        ticks: { font: { size: 12 } },
+        grid: { color: "#e5e7eb" },
+      },
+      y: {
+        ticks: { font: { size: 12 } },
+        grid: { color: "#e5e7eb" },
+        beginAtZero: false,
+        suggestedMin:
+          Math.min(...dataGraph.map((d) => Number(d[dataKey]) || 0)) - 10,
+        suggestedMax:
+          Math.max(...dataGraph.map((d) => Number(d[dataKey]) || 0)) + 10,
+      },
+    },
+  };
+
+  const topAndil = transformAndil(
+    data,
+    selectedTahun,
+    selectedBulan,
+    selectedIndicator
+  );
 
   let titleHeader = "";
   let content = [];
@@ -100,31 +177,32 @@ export default function Dashboard() {
     ];
   }
 
-  const handleLoad = async () => {
-    const res = await fetch(`/api/sheet`);
-    const result = await res.json();
-    setData(result.filtered);
-    setDataGraph(result.graph);
-  };
-
   const getFilters = async () => {
+    setLoading(true); // mulai loading
     const res = await fetch(`/api/getFilter`);
     const result = await res.json();
-    // console.log(result);
-
     setKomoditas(result.komoditas);
     setTahun(result.tahun);
     setBulan(result.bulan);
-    // console.log("Komoditas:", result);
-    // setData(result);
+    setLoading(false); // selesai loading
+  };
+
+  const getData = async () => {
+    setLoading(true);
+    const res = await fetch(
+      `/api/filteredData?flag=1&tahun=${selectedTahun}&bulan=${selectedBulan}`
+    );
+    const result = await res.json();
+    setData(result.graph);
+    setLoading(false);
   };
 
   const selectFilterHandle = async () => {
     const res = await fetch(
-      `/api/sheet?nama=${selectedKomoditas}&tahun=${selectedTahun}&bulan=${selectedBulan}`
+      `/api/filteredData?nama=${selectedKomoditas}&tahun=${selectedTahun}&bulan=${selectedBulan}`
     );
     const result = await res.json();
-    setData(result.filtered);
+    setFilteredData(result.filtered);
     setDataGraph(result.graph);
     setValueIHK(result.filtered["IHK"]);
     setValueHarga(result.filtered["Harga"]);
@@ -134,101 +212,145 @@ export default function Dashboard() {
   };
 
   useEffect(() => {
-    handleLoad();
-    getFilters();
-    // console.log("Data loaded:", dataGraph);
-  }, []);
+    const fetchData = async () => {
+      setLoading(true);
+      await getFilters();
+      await getData();
+      setLoading(false);
+    };
+    fetchData();
+  }, [selectedBulan]);
+
+  useEffect(() => {
+    if (selectedKomoditas && selectedTahun && selectedBulan) {
+      selectFilterHandle();
+    }
+  }, [selectedKomoditas, selectedTahun, selectedBulan]);
 
   useEffect(() => {
     setPage(searchParams.get("page"));
   }, [searchParams]);
 
   return (
-    <>
+    <div className="bg-gradient-to-b from-[#ffe97d9b] to-[#fcd498]">
+      {/* <div className="p-6"> */}
       <Header />
-      <div className="p-6 space-y-4 max-w-7xl min-h-screen mx-auto">
-        <h1 className="text-2xl font-bold">{titleHeader}</h1>
-
-        <div className="bg-white shadow-md rounded-2xl p-6 flex flex-col sm:flex-row sm:space-x-4 space-y-4 sm:space-y-0">
-          <FilterSelect
-            filter="Komoditas"
-            options={komoditas}
-            onChange={(value) => setSelectedKomoditas(value)}
-          />
-          <FilterSelect
-            filter="Tahun"
-            options={tahun}
-            onChange={(value) => setSelectedTahun(value)}
-          />
-          <FilterSelect
-            filter="Bulan"
-            options={bulan}
-            onChange={(value) => setSelectedBulan(value)}
-          />
-          <button
-            onClick={() => selectFilterHandle()}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-          >
-            Tampilkan
-          </button>
+      {/* </div> */}
+      {loading ? (
+        <div className="p-6 space-y-4 max-w-7xl min-h-screen flex justify-center items-center mx-auto">
+          <Loading />
         </div>
+      ) : (
+        <div className="p-6 space-y-4 max-w-7xl min-h-screen mx-auto">
+          <h1 className="text-2xl font-bold">{titleHeader}</h1>
 
-        {/* Nilai Inflasi dll */}
-        <div className="w-full flex justify-center items-center py-4">
-          <div
-            className={`grid gap-x-20 ${
-              page ? "grid-cols-1 md:grid-cols-2" : "grid-cols-1 md:grid-cols-3"
-            }`}
-          >
-            {content.map((item, idx) => (
-              <ValueContainer key={idx} title={item.title} value={item.value} />
-            ))}
+          <div className="bg-white shadow-md rounded-2xl p-6 ">
+            <h1 className="text-xl font-semibold mb-2">Filter</h1>
+            <div className="font-medium text-gray-700 mb-2">Pilih :</div>
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+              {/* Filter Group */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:flex lg:space-x-4 gap-4">
+                <FilterSelect
+                  filter="Komoditas"
+                  options={komoditas}
+                  onChange={(value) => setSelectedKomoditas(value)}
+                  value={selectedKomoditas}
+                />
+                <FilterSelect
+                  filter="Tahun"
+                  options={tahun}
+                  onChange={(value) => setSelectedTahun(value)}
+                  value={selectedTahun}
+                />
+                <FilterSelect
+                  filter="Bulan"
+                  options={bulan}
+                  onChange={(value) => setSelectedBulan(value)}
+                  value={selectedBulan}
+                />
+              </div>
+
+              {/* Button */}
+              <button
+                onClick={() => selectFilterHandle()}
+                className="px-5 py-2.5 bg-[#FF9B00] hover:bg-[#FFC900] text-white font-semibold rounded-lg shadow transition"
+              >
+                Tampilkan
+              </button>
+            </div>
+            {/* Indikator Select */}
+            <div className="mt-4 ">
+              {!page && (
+                <div className="flex flex-col gap-2">
+                  <div className="font-medium text-gray-700">
+                    Pilih Indikator:
+                  </div>
+                  <FilterSelect
+                    filter="Indikator"
+                    options={["Inflasi MtM", "Inflasi YoY", "Inflasi YtD"]}
+                    onChange={(value) => setSelectedIndicator(value)}
+                    value={selectedIndicator}
+                  />
+                  {/* <select
+                  value={selectedIndicator}
+                  onChange={(e) => setSelectedIndicator(e.target.value)}
+                  className="border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-[#FF9B00] focus:outline-none transition"
+                >
+                  <option value="Inflasi MtM">Inflasi M-to-M</option>
+                  <option value="Inflasi YoY">Inflasi Y-on-Y</option>
+                  <option value="Inflasi YtD">Inflasi Y-to-D</option>
+                </select> */}
+                </div>
+              )}
+            </div>
           </div>
-        </div>
 
-        {/* Chart */}
-        <div className="bg-white shadow-md rounded-2xl p-6">
-          <h2 className="text-xl font-semibold mb-2">Grafik Harga Komoditas</h2>
-          <p className="text-sm text-gray-500 mb-4">
-            Pilih komoditas untuk melihat grafik harga per bulan.
-          </p>
-          {dataGraph?.length > 0 ? (
-            <ResponsiveContainer width="100%" height={400}>
-              <LineChart data={dataGraph}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                <XAxis dataKey="Bulan" tick={{ fontSize: 12 }} />
-                <YAxis
-                  domain={["dataMin - 10", "dataMax + 10"]}
-                  tick={{ fontSize: 12 }}
+          {/* Nilai Inflasi dll */}
+          <div className="w-full flex justify-center items-center py-4">
+            <div
+              className={`grid gap-x-20 ${
+                page
+                  ? "grid-cols-1 md:grid-cols-2"
+                  : "grid-cols-1 md:grid-cols-3"
+              }`}
+            >
+              {content.map((item, idx) => (
+                <ValueContainer
+                  key={idx}
+                  title={item.title}
+                  value={item.value}
                 />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: "#fff",
-                    borderRadius: "8px",
-                  }}
-                />
+              ))}
+            </div>
+          </div>
 
-                <Line
-                  type="monotone"
-                  dataKey={
-                    page === "ihk"
-                      ? "IHK"
-                      : page === "harga"
-                      ? "Harga"
-                      : "Inflasi MtM"
-                  }
-                  stroke="#2563eb"
-                  strokeWidth={3}
-                  dot={{ r: 4, fill: "#2563eb" }}
-                  activeDot={{ r: 6, stroke: "#1d4ed8", strokeWidth: 2 }}
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          ) : (
-            <p className="text-gray-400">Belum ada data yang ditampilkan.</p>
+          {/* Chart */}
+          <div className="bg-white shadow-md rounded-2xl p-6">
+            <h2 className="text-xl font-semibold mb-2">
+              Grafik Harga Komoditas
+            </h2>
+            <p className="text-sm text-gray-500 mb-4">
+              Pilih komoditas untuk melihat grafik harga per bulan.
+            </p>
+            {dataGraph?.length > 0 ? (
+              <div style={{ width: "100%", height: 400 }}>
+                <Line data={chartData} options={chartOptions} />
+              </div>
+            ) : (
+              <p className="text-gray-400">Belum ada data yang ditampilkan.</p>
+            )}
+          </div>
+          {!page && ( // hanya tampilkan kalau di halaman utama
+            <div className="bg-white rounded-2xl p-6">
+              <h2 className="text-xl font-semibold mb-4">
+                Komoditas Penyumbang Inflasi (Andil MtM)
+              </h2>
+
+              <TopAndilChart data={topAndil} />
+            </div>
           )}
         </div>
-      </div>
-    </>
+      )}
+    </div>
   );
 }

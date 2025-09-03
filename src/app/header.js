@@ -1,21 +1,30 @@
-"use client";
-
+import { HiHome, HiChartSquareBar, HiCurrencyDollar, HiMenu, HiX } from "react-icons/hi";
 import Link from "next/link";
-import { useState } from "react";
-import { HiMenu, HiX } from "react-icons/hi"; 
+import { useState, useEffect } from "react";
 
 export default function Header() {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [isScrolled, setIsScrolled] = useState(false);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setIsScrolled(window.scrollY > 20);
+    };
+    window.addEventListener("scroll", handleScroll);
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
 
   return (
-    <header className="bg-white shadow-md sticky top-0 z-50">
+    <header
+      className={`sticky top-2 z-50 mx-auto max-w-7xl rounded-2xl shadow-md transition-colors duration-300 ${
+        isScrolled ? "bg-transparent" : "bg-white"
+      }`}
+    >
       <div className="max-w-7xl px-4 sm:px-6 lg:px-8 py-2">
         <div className="flex justify-between items-center h-16">
           {/* Logo */}
           <div className="flex items-center">
-            <div className="flex-shrink-0">
-              <img src="/images/LOGO-BPS.png" className="w-18" alt="Logo" />
-            </div>
+            <img src="/images/LOGO-BPS.png" className="w-18" alt="Logo" />
             <div className="ml-3 flex flex-col">
               <span className="font-bold text-lg italic">Dashboard Data Harga</span>
               <span className="text-sm italic">BPS KAB MAJENE</span>
@@ -23,15 +32,15 @@ export default function Header() {
           </div>
 
           {/* Navigation desktop */}
-          <nav className="hidden md:flex space-x-6">
-            <Link href="/" className="text-gray-700 hover:text-blue-600">
-              Dashboard
+          <nav className="hidden md:flex space-x-6 items-center">
+            <Link href="/" className="flex items-center gap-2 text-gray-700 hover:text-[#FF9B00]">
+              <HiHome size={18} /> Dashboard
             </Link>
-            <Link href="/?page=ihk" className="text-gray-700 hover:text-blue-600">
-              IHK
+            <Link href="/?page=ihk" className="flex items-center gap-2 text-gray-700 hover:text-[#FF9B00]">
+              <HiChartSquareBar size={18} /> IHK
             </Link>
-            <Link href="/?page=harga" className="text-gray-700 hover:text-blue-600">
-              Harga
+            <Link href="/?page=harga" className="flex items-center gap-2 text-gray-700 hover:text-[#FF9B00]">
+              <HiCurrencyDollar size={18} /> Harga
             </Link>
           </nav>
 
@@ -49,26 +58,14 @@ export default function Header() {
         {/* Mobile menu */}
         {menuOpen && (
           <nav className="md:hidden mt-2 flex flex-col space-y-2">
-            <Link
-              href="/"
-              className="text-gray-700 hover:text-blue-600"
-              onClick={() => setMenuOpen(false)}
-            >
-              Dashboard
+            <Link href="/" className="flex items-center gap-2 text-gray-700 hover:text-[#FF9B00]" onClick={() => setMenuOpen(false)}>
+              <HiHome size={18} /> Dashboard
             </Link>
-            <Link
-              href="/?page=ihk"
-              className="text-gray-700 hover:text-blue-600"
-              onClick={() => setMenuOpen(false)}
-            >
-              IHK
+            <Link href="/?page=ihk" className="flex items-center gap-2 text-gray-700 hover:text-[#FF9B00]" onClick={() => setMenuOpen(false)}>
+              <HiChartSquareBar size={18} /> IHK
             </Link>
-            <Link
-              href="/?page=harga"
-              className="text-gray-700 hover:text-blue-600"
-              onClick={() => setMenuOpen(false)}
-            >
-              Harga
+            <Link href="/?page=harga" className="flex items-center gap-2 text-gray-700 hover:text-[#FF9B00]" onClick={() => setMenuOpen(false)}>
+              <HiCurrencyDollar size={18} /> Harga
             </Link>
           </nav>
         )}
