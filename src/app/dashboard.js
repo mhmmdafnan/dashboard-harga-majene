@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import {
   Chart as ChartJS,
@@ -22,6 +22,8 @@ ChartJS.register(
   Tooltip,
   Legend
 );
+import { FaFileCsv, FaFileImage } from "react-icons/fa6";
+
 import dynamic from "next/dynamic";
 import Header from "./header";
 const Loading = dynamic(() => import("@/components/Loading"), {
@@ -92,6 +94,39 @@ export default function Dashboard() {
   const [page, setPage] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  const lineChartRef = useRef(null);
+
+  // Fungsi download grafik PNG
+  const downloadLineChart = () => {
+    if (!lineChartRef.current) return;
+    const link = document.createElement("a");
+    link.download = `grafik_${selectedIndicator.replace(
+      /\s+/g,
+      "_"
+    )}_${selectedKomoditas}.png`;
+    link.href = lineChartRef.current.toBase64Image();
+    link.click();
+  };
+
+  // Fungsi download data CSV
+  const downloadLineCSV = () => {
+    if (!dataGraph || dataGraph.length === 0) return;
+
+    const headers = ["Bulan", selectedIndicator];
+    const rows = dataGraph.map((d) => [d.Bulan, d[selectedIndicator] || 0]);
+    const csvContent =
+      "data:text/csv;charset=utf-8," +
+      [headers, ...rows].map((r) => r.join(";")).join("\n");
+
+    const link = document.createElement("a");
+    link.href = encodeURI(csvContent);
+    link.download = `data_${selectedIndicator.replace(
+      /\s+/g,
+      "_"
+    )}_${selectedKomoditas}.csv`;
+    link.click();
+  };
+
   // Line Chart
   const defaultKey =
     page === "ihk" ? "IHK" : page === "harga" ? "Harga" : "Inflasi YoY";
@@ -131,10 +166,25 @@ export default function Dashboard() {
     },
     scales: {
       x: {
+        title: {
+          display: true, // harus true supaya muncul
+          text: "Bulan", // label sumbu X
+          color: "#111",
+          font: {
+            size: 14,
+            weight: "bold",
+          },
+        },
         ticks: { font: { size: 12 } },
         grid: { color: "#e5e7eb" },
       },
       y: {
+        title: {
+          display: true,
+          text: selectedIndicator, // label sumbu Y
+          color: "#111",
+          font: { size: 14, weight: "bold" },
+        },
         ticks: { font: { size: 12 } },
         grid: { color: "#e5e7eb" },
         beginAtZero: false,
@@ -325,16 +375,43 @@ export default function Dashboard() {
           </div>
 
           {/* Chart */}
-          <div className="bg-white shadow-md rounded-2xl p-6">
-            <h2 className="text-xl font-semibold mb-2">
-              Grafik Harga Komoditas
-            </h2>
-            <p className="text-sm text-gray-500 mb-4">
-              Pilih komoditas untuk melihat grafik harga per bulan.
-            </p>
+          <div className="bg-white shadow-md rounded-2xl p-6 ">
+            <div className="mb-4 flex flex-col md:flex-row justify-between items-center">
+              <h2 className="text-xl font-semibold mb-4">
+                Grafik {selectedIndicator} Komoditas {selectedKomoditas} Bulan{" "}
+                {selectedBulan} Tahun {selectedTahun}
+              </h2>
+              {dataGraph?.length > 0 ? (
+                <>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={downloadLineChart}
+                      className="bg-[#FF9B00] hover:bg-[#FFC900] text-white px-4 w-fit py-2 rounded cursor-pointer"
+                    >
+                      <FaFileImage className="inline mr-1" /> Grafik
+                    </button>
+                    <button
+                      onClick={downloadLineCSV}
+                      className="bg-gray-700 text-white px-4 py-2 w-fit rounded cursor-pointer hover:bg-gray-800"
+                    >
+                      <FaFileCsv className="inline mr-1" /> Data CSV
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <p className="text-gray-400">
+                  Belum ada data yang ditampilkan.
+                </p>
+              )}
+            </div>
+
             {dataGraph?.length > 0 ? (
               <div style={{ width: "100%", height: 400 }}>
-                <Line data={chartData} options={chartOptions} />
+                <Line
+                  ref={lineChartRef}
+                  data={chartData}
+                  options={chartOptions}
+                />
               </div>
             ) : (
               <p className="text-gray-400">Belum ada data yang ditampilkan.</p>
@@ -342,11 +419,7 @@ export default function Dashboard() {
           </div>
           {!page && ( // hanya tampilkan kalau di halaman utama
             <div className="bg-white rounded-2xl p-6">
-              <h2 className="text-xl font-semibold mb-4">
-                Komoditas Penyumbang Inflasi (Andil MtM)
-              </h2>
-
-              <TopAndilChart data={topAndil} />
+              <TopAndilChart data={topAndil} title={selectedIndicator} />
             </div>
           )}
         </div>

@@ -1,10 +1,21 @@
-import { HiHome, HiChartSquareBar, HiCurrencyDollar, HiMenu, HiX } from "react-icons/hi";
+"use client";
+
+import {
+  HiHome,
+  HiChartSquareBar,
+  HiCurrencyDollar,
+  HiMenu,
+  HiX,
+} from "react-icons/hi";
 import Link from "next/link";
 import { useState, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 
 export default function Header() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
+  const searchParams = useSearchParams();
+  const page = searchParams.get("page") || "dashboard";
 
   useEffect(() => {
     const handleScroll = () => {
@@ -13,6 +24,44 @@ export default function Header() {
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
+
+  const navItems = [
+    {
+      name: "Dashboard",
+      icon: <HiHome size={18} />,
+      href: "/",
+      page: "dashboard",
+    },
+    {
+      name: "IHK",
+      icon: <HiChartSquareBar size={18} />,
+      href: "/?page=ihk",
+      page: "ihk",
+    },
+    {
+      name: "Harga",
+      icon: <HiCurrencyDollar size={18} />,
+      href: "/?page=harga",
+      page: "harga",
+    },
+  ];
+
+  const renderLink = (item) => {
+    const isActive = page === item.page;
+    const baseClass =
+      "flex items-center gap-2 hover:text-[#FF9B00]";
+    const activeClass = " text-[#FF9B00] font-semibold";
+    return (
+      <Link
+        key={item.name}
+        href={item.href}
+        className={`${baseClass} ${isActive ? activeClass : ""}`}
+        onClick={() => setMenuOpen(false)}
+      >
+        {item.icon} {item.name}
+      </Link>
+    );
+  };
 
   return (
     <header
@@ -26,22 +75,16 @@ export default function Header() {
           <div className="flex items-center">
             <img src="/images/LOGO-BPS.png" className="w-18" alt="Logo" />
             <div className="ml-3 flex flex-col">
-              <span className="font-bold text-lg italic">Dashboard Data Harga</span>
+              <span className="font-bold text-lg italic">
+                Dashboard Data Harga
+              </span>
               <span className="text-sm italic">BPS KAB MAJENE</span>
             </div>
           </div>
 
           {/* Navigation desktop */}
           <nav className="hidden md:flex space-x-6 items-center">
-            <Link href="/" className="flex items-center gap-2 text-gray-700 hover:text-[#FF9B00]">
-              <HiHome size={18} /> Dashboard
-            </Link>
-            <Link href="/?page=ihk" className="flex items-center gap-2 text-gray-700 hover:text-[#FF9B00]">
-              <HiChartSquareBar size={18} /> IHK
-            </Link>
-            <Link href="/?page=harga" className="flex items-center gap-2 text-gray-700 hover:text-[#FF9B00]">
-              <HiCurrencyDollar size={18} /> Harga
-            </Link>
+            {navItems.map(renderLink)}
           </nav>
 
           {/* Hamburger menu mobile */}
@@ -58,15 +101,7 @@ export default function Header() {
         {/* Mobile menu */}
         {menuOpen && (
           <nav className="md:hidden mt-2 flex flex-col space-y-2">
-            <Link href="/" className="flex items-center gap-2 text-gray-700 hover:text-[#FF9B00]" onClick={() => setMenuOpen(false)}>
-              <HiHome size={18} /> Dashboard
-            </Link>
-            <Link href="/?page=ihk" className="flex items-center gap-2 text-gray-700 hover:text-[#FF9B00]" onClick={() => setMenuOpen(false)}>
-              <HiChartSquareBar size={18} /> IHK
-            </Link>
-            <Link href="/?page=harga" className="flex items-center gap-2 text-gray-700 hover:text-[#FF9B00]" onClick={() => setMenuOpen(false)}>
-              <HiCurrencyDollar size={18} /> Harga
-            </Link>
+            {navItems.map(renderLink)}
           </nav>
         )}
       </div>
