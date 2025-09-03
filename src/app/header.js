@@ -73,7 +73,7 @@ export default function Header() {
         <div className="flex justify-between items-center h-16">
           {/* Logo */}
           <div className="flex items-center">
-            <img src="/images/LOGO-BPS.png" className="w-18" alt="Logo" />
+            <img src="/favicon.png" className="w-18" alt="Logo" />
             <div className="ml-3 flex flex-col">
               <span className="font-bold text-lg italic">
                 Dashboard Data Harga
