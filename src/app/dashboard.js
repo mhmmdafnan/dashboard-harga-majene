@@ -65,13 +65,13 @@ export function transformAndil(data, tahun, bulan, indikator) {
   }));
 
   // Urutkan desc & ambil top 10
-  return mapped.sort((a, b) => b.andil - a.andil).slice(0, 10);
+  return mapped.sort((a, b) => b.andil - a.andil);
 }
 
 export default function Dashboard() {
   const now = new Date();
   const currentYear = String(now.getFullYear()); // 2025
-  const currentMonth = String(now.getMonth() + 1); // 9 (ingat getMonth() mulai dari 0)
+  const currentMonth = now.getMonth() + 1; // dari 0–11 jadi 1–12
 
   const [komoditas, setKomoditas] = useState([]);
   const [valueYoY, setValueYoY] = useState();
@@ -83,8 +83,8 @@ export default function Dashboard() {
   const [bulan, setBulan] = useState([]);
   const [selectedKomoditas, setSelectedKomoditas] = useState("UMUM");
   const [selectedTahun, setSelectedTahun] = useState(currentYear);
-  // const [selectedBulan, setSelectedBulan] = useState(currentMonth);
-  const [selectedBulan, setSelectedBulan] = useState("7");
+  const [selectedBulan, setSelectedBulan] = useState(String(currentMonth - 1));
+  // const [selectedBulan, setSelectedBulan] = useState("7");
   const [data, setData] = useState([]);
   const [filteredData, setFilteredData] = useState([]);
   const [dataGraph, setDataGraph] = useState([]);
@@ -133,18 +133,23 @@ export default function Dashboard() {
 
   const dataKey = selectedIndicator || defaultKey;
 
+  const sortedGraph = [...dataGraph].sort((a, b) => {
+    const yearA = Number(a.Tahun),
+      yearB = Number(b.Tahun);
+    const monthA = Number(a.Bulan),
+      monthB = Number(b.Bulan);
+    return yearA !== yearB ? yearA - yearB : monthA - monthB;
+  });
+
   const chartData = {
-    labels: dataGraph.map((d) => d.Bulan),
+    labels: sortedGraph.map((d) => `${d.Bulan}/${d.Tahun}`), // biar jelas Bulan/Tahun
     datasets: [
       {
         label: dataKey,
-        data: dataGraph.map((d) => Number(d[dataKey])),
-        borderColor: "#f97316", // orange-500
-        backgroundColor: "#fdba74", // orange-300
-        pointBackgroundColor: "#ea580c", // orange-600
-        pointBorderColor: "#c2410c", // orange-700
-        tension: 0.4, // bikin garis smooth
-        // fill: true, // area di bawah garis diwarnai
+        data: sortedGraph.map((d) => Number(d[dataKey].replace(",", "."))), // convert jika ada koma
+        borderColor: "#f97316",
+        backgroundColor: "#fdba74",
+        tension: 0.4,
       },
     ],
   };
@@ -238,13 +243,13 @@ export default function Dashboard() {
   };
 
   const getData = async () => {
-    setLoading(true);
+    // setLoading(true);
     const res = await fetch(
       `/api/filteredData?flag=1&tahun=${selectedTahun}&bulan=${selectedBulan}`
     );
     const result = await res.json();
     setData(result.graph);
-    setLoading(false);
+    // setLoading(false);
   };
 
   const selectFilterHandle = async () => {
@@ -252,6 +257,9 @@ export default function Dashboard() {
       `/api/filteredData?nama=${selectedKomoditas}&tahun=${selectedTahun}&bulan=${selectedBulan}`
     );
     const result = await res.json();
+    console.log("filter", result.filtered);
+    console.log("graph", result.graph);
+
     setFilteredData(result.filtered);
     setDataGraph(result.graph);
     setValueIHK(result.filtered["IHK"]);
@@ -269,11 +277,12 @@ export default function Dashboard() {
       setLoading(false);
     };
     fetchData();
-  }, [selectedBulan]);
+  }, []);
 
   useEffect(() => {
     if (selectedKomoditas && selectedTahun && selectedBulan) {
       selectFilterHandle();
+      getData();
     }
   }, [selectedKomoditas, selectedTahun, selectedBulan]);
 
@@ -296,8 +305,7 @@ export default function Dashboard() {
 
           <div className="bg-white shadow-md rounded-2xl p-6 ">
             <h1 className="text-xl font-semibold mb-2">Filter</h1>
-            <div className="font-medium text-gray-700 mb-2">Pilih :</div>
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+            <div className="flex flex-col gap-4 lg:flex-row justify-center items-center">
               {/* Filter Group */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:flex lg:space-x-4 gap-4">
                 <FilterSelect
@@ -318,40 +326,17 @@ export default function Dashboard() {
                   onChange={(value) => setSelectedBulan(value)}
                   value={selectedBulan}
                 />
-              </div>
-
-              {/* Button */}
-              <button
-                onClick={() => selectFilterHandle()}
-                className="px-5 py-2.5 bg-[#FF9B00] hover:bg-[#FFC900] text-white font-semibold rounded-lg shadow transition"
-              >
-                Tampilkan
-              </button>
-            </div>
-            {/* Indikator Select */}
-            <div className="mt-4 ">
-              {!page && (
-                <div className="flex flex-col gap-2">
-                  <div className="font-medium text-gray-700">
-                    Pilih Indikator:
+                {!page && (
+                  <div className="flex flex-col gap-2">
+                    <FilterSelect
+                      filter="Indikator"
+                      options={["Inflasi MtM", "Inflasi YoY", "Inflasi YtD"]}
+                      onChange={(value) => setSelectedIndicator(value)}
+                      value={selectedIndicator}
+                    />
                   </div>
-                  <FilterSelect
-                    filter="Indikator"
-                    options={["Inflasi MtM", "Inflasi YoY", "Inflasi YtD"]}
-                    onChange={(value) => setSelectedIndicator(value)}
-                    value={selectedIndicator}
-                  />
-                  {/* <select
-                  value={selectedIndicator}
-                  onChange={(e) => setSelectedIndicator(e.target.value)}
-                  className="border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-[#FF9B00] focus:outline-none transition"
-                >
-                  <option value="Inflasi MtM">Inflasi M-to-M</option>
-                  <option value="Inflasi YoY">Inflasi Y-on-Y</option>
-                  <option value="Inflasi YtD">Inflasi Y-to-D</option>
-                </select> */}
-                </div>
-              )}
+                )}
+              </div>
             </div>
           </div>
 

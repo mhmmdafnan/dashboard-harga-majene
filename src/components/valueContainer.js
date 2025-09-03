@@ -9,7 +9,7 @@ export default function ValueContainer({ title, value }) {
 
         {/* Nilai rata tengah */}
         <div className="flex items-center justify-center text-4xl font-bold px-10 w-60">
-          {value ? value : "-"} %
+          {value ? value : "-"}
         </div>
       </div>
     </>

@@ -17,7 +17,7 @@ export default async function handler(req, res) {
 
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId: "1R9_IijsAoi9UYZvipw7zkzyIsbCibR-R9BSUYSAcp7U",
-      range: "Sheet1!A1:AB3090",
+      range: "Sheet1!A1:AB6000",
     });
 
     const rows = response.data.values;
@@ -37,7 +37,7 @@ export default async function handler(req, res) {
     const now = new Date();
     const defaultNama = "UMUM";
     const defaultTahun = now.getFullYear();
-    const defaultBulan = now.getMonth() + 1; // bulan 1-12
+    const defaultBulan = now.getMonth(); // bulan 1-12
 
     // ==== Ambil parameter dari frontend atau fallback ke default ====
     const nama = req.query.nama || defaultNama;
@@ -69,7 +69,7 @@ export default async function handler(req, res) {
     } else {
       // Kalau ga ada flag → ambil data nama komoditas 12 bulan ke belakang
       let monthsRange = [];
-      for (let i = 0; i < 12; i++) {
+      for (let i = 0; i < 13; i++) {
         let m = bulan - i;
         let y = tahun;
         if (m <= 0) {
