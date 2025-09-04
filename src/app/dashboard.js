@@ -25,7 +25,8 @@ ChartJS.register(
 import { FaFileCsv, FaFileImage } from "react-icons/fa6";
 
 import dynamic from "next/dynamic";
-import Header from "./header";
+import Header from "../components/header";
+import Footer from "../components/footer";
 const Loading = dynamic(() => import("@/components/Loading"), {
   ssr: false,
 });
@@ -91,10 +92,17 @@ export default function Dashboard() {
 
   const [selectedIndicator, setSelectedIndicator] = useState("Inflasi YoY");
   const searchParams = useSearchParams();
-  const [page, setPage] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(searchParams.get("page"));
+  const [dataKey, setDataKey] = useState("");
 
   const lineChartRef = useRef(null);
+
+  const getDefaultKey = (page, selectedIndicator) => {
+    if (page === "harga") return "Harga";
+    if (page === "ihk") return "IHK";
+    return selectedIndicator || "Inflasi YoY"; // fallback kalau dashboard utama
+  };
 
   // Fungsi download grafik PNG
   const downloadLineChart = () => {
@@ -127,11 +135,17 @@ export default function Dashboard() {
     link.click();
   };
 
-  // Line Chart
-  const defaultKey =
-    page === "ihk" ? "IHK" : page === "harga" ? "Harga" : "Inflasi YoY";
-
-  const dataKey = selectedIndicator || defaultKey;
+  const normalizeNumber = (val) => {
+    if (!val) return 0;
+    return (
+      Number(
+        String(val)
+          .replace(/[^\d,-]/g, "") // hapus semua kecuali angka, koma, minus
+          .replace(/\./g, "") // hapus titik (ribuan)
+          .replace(",", ".") // ganti koma jadi titik desimal
+      ) || 0
+    );
+  };
 
   const sortedGraph = [...dataGraph].sort((a, b) => {
     const yearA = Number(a.Tahun),
@@ -142,11 +156,20 @@ export default function Dashboard() {
   });
 
   const chartData = {
-    labels: sortedGraph.map((d) => `${d.Bulan}/${d.Tahun}`), // biar jelas Bulan/Tahun
+    labels: sortedGraph.map((d) => `${d.Bulan}/${d.Tahun}`),
     datasets: [
       {
         label: dataKey,
-        data: sortedGraph.map((d) => Number(d[dataKey].replace(",", "."))), // convert jika ada koma
+        data: sortedGraph.map((d) => {
+          const raw = d[dataKey];
+          if (!raw) return null;
+
+          // Hapus koma ribuan
+          const cleaned = String(raw).replace(/,/g, "");
+          const num = Number(cleaned);
+
+          return isNaN(num) ? null : num;
+        }),
         borderColor: "#f97316",
         backgroundColor: "#fdba74",
         tension: 0.4,
@@ -186,7 +209,7 @@ export default function Dashboard() {
       y: {
         title: {
           display: true,
-          text: selectedIndicator, // label sumbu Y
+          text: dataKey, // label sumbu Y
           color: "#111",
           font: { size: 14, weight: "bold" },
         },
@@ -243,13 +266,11 @@ export default function Dashboard() {
   };
 
   const getData = async () => {
-    // setLoading(true);
     const res = await fetch(
       `/api/filteredData?flag=1&tahun=${selectedTahun}&bulan=${selectedBulan}`
     );
     const result = await res.json();
     setData(result.graph);
-    // setLoading(false);
   };
 
   const selectFilterHandle = async () => {
@@ -269,146 +290,151 @@ export default function Dashboard() {
     setValueYtD(result.filtered["Inflasi YtD"]);
   };
 
+  // Pertama kali load → ambil filters
   useEffect(() => {
-    const fetchData = async () => {
+    const fetchFilters = async () => {
       setLoading(true);
       await getFilters();
-      await getData();
       setLoading(false);
     };
-    fetchData();
+    fetchFilters();
   }, []);
 
+  // Kalau filter berubah → ambil data
   useEffect(() => {
     if (selectedKomoditas && selectedTahun && selectedBulan) {
-      selectFilterHandle();
-      getData();
+      const fetchData = async () => {
+        setLoading(true);
+        await selectFilterHandle();
+        setLoading(false);
+      };
+      fetchData();
     }
   }, [selectedKomoditas, selectedTahun, selectedBulan]);
 
+  // Kalau page/indikator berubah → set dataKey
   useEffect(() => {
-    setPage(searchParams.get("page"));
-  }, [searchParams]);
+    const currentPage = searchParams.get("page");
+    setPage(currentPage);
+
+    const newKey = getDefaultKey(currentPage, selectedIndicator);
+    setDataKey(newKey);
+
+    // kalau pindah page butuh data baru
+    if (currentPage) {
+      setLoading(true);
+      getData().finally(() => setLoading(false));
+    }
+  }, [searchParams, selectedIndicator]);
 
   return (
     <div className="bg-gradient-to-b from-[#ffe97d9b] to-[#fcd498]">
       {/* <div className="p-6"> */}
       <Header />
       {/* </div> */}
-      {loading ? (
-        <div className="p-6 space-y-4 max-w-7xl min-h-screen flex justify-center items-center mx-auto">
-          <Loading />
-        </div>
-      ) : (
-        <div className="p-6 space-y-4 max-w-7xl min-h-screen mx-auto">
-          <h1 className="text-2xl font-bold">{titleHeader}</h1>
+      {loading && <Loading />}
+      <div className="p-6 space-y-4 max-w-7xl min-h-screen mx-auto">
+        <h1 className="text-2xl font-bold">{titleHeader}</h1>
 
-          <div className="bg-white shadow-md rounded-2xl p-6 ">
-            <h1 className="text-xl font-semibold mb-2">Filter</h1>
-            <div className="flex flex-col gap-4 lg:flex-row justify-center items-center">
-              {/* Filter Group */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:flex lg:space-x-4 gap-4">
-                <FilterSelect
-                  filter="Komoditas"
-                  options={komoditas}
-                  onChange={(value) => setSelectedKomoditas(value)}
-                  value={selectedKomoditas}
-                />
-                <FilterSelect
-                  filter="Tahun"
-                  options={tahun}
-                  onChange={(value) => setSelectedTahun(value)}
-                  value={selectedTahun}
-                />
-                <FilterSelect
-                  filter="Bulan"
-                  options={bulan}
-                  onChange={(value) => setSelectedBulan(value)}
-                  value={selectedBulan}
-                />
-                {!page && (
-                  <div className="flex flex-col gap-2">
-                    <FilterSelect
-                      filter="Indikator"
-                      options={["Inflasi MtM", "Inflasi YoY", "Inflasi YtD"]}
-                      onChange={(value) => setSelectedIndicator(value)}
-                      value={selectedIndicator}
-                    />
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Nilai Inflasi dll */}
-          <div className="w-full flex justify-center items-center py-4">
-            <div
-              className={`grid gap-x-20 ${
-                page
-                  ? "grid-cols-1 md:grid-cols-2"
-                  : "grid-cols-1 md:grid-cols-3"
-              }`}
-            >
-              {content.map((item, idx) => (
-                <ValueContainer
-                  key={idx}
-                  title={item.title}
-                  value={item.value}
-                />
-              ))}
-            </div>
-          </div>
-
-          {/* Chart */}
-          <div className="bg-white shadow-md rounded-2xl p-6 ">
-            <div className="mb-4 flex flex-col md:flex-row justify-between items-center">
-              <h2 className="text-xl font-semibold mb-4">
-                Grafik {selectedIndicator} Komoditas {selectedKomoditas} Bulan{" "}
-                {selectedBulan} Tahun {selectedTahun}
-              </h2>
-              {dataGraph?.length > 0 ? (
-                <>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={downloadLineChart}
-                      className="bg-[#FF9B00] hover:bg-[#FFC900] text-white px-4 w-fit py-2 rounded cursor-pointer"
-                    >
-                      <FaFileImage className="inline mr-1" /> Grafik
-                    </button>
-                    <button
-                      onClick={downloadLineCSV}
-                      className="bg-gray-700 text-white px-4 py-2 w-fit rounded cursor-pointer hover:bg-gray-800"
-                    >
-                      <FaFileCsv className="inline mr-1" /> Data CSV
-                    </button>
-                  </div>
-                </>
-              ) : (
-                <p className="text-gray-400">
-                  Belum ada data yang ditampilkan.
-                </p>
+        <div className="bg-white shadow-md rounded-2xl p-6 ">
+          <h1 className="text-xl font-semibold mb-2">Filter</h1>
+          <div className="flex flex-col gap-4 lg:flex-row justify-center items-center">
+            {/* Filter Group */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:flex lg:space-x-4 gap-4">
+              <FilterSelect
+                filter="Komoditas"
+                options={komoditas}
+                onChange={(value) => setSelectedKomoditas(value)}
+                value={selectedKomoditas}
+              />
+              <FilterSelect
+                filter="Tahun"
+                options={tahun}
+                onChange={(value) => setSelectedTahun(value)}
+                value={selectedTahun}
+              />
+              <FilterSelect
+                filter="Bulan"
+                options={bulan}
+                onChange={(value) => setSelectedBulan(value)}
+                value={selectedBulan}
+              />
+              {!page && (
+                <div className="flex flex-col gap-2">
+                  <FilterSelect
+                    filter="Indikator"
+                    options={["Inflasi MtM", "Inflasi YoY", "Inflasi YtD"]}
+                    onChange={(value) => setSelectedIndicator(value)}
+                    value={selectedIndicator}
+                  />
+                </div>
               )}
             </div>
+          </div>
+        </div>
 
+        {/* Nilai Inflasi dll */}
+        <div className="w-full flex justify-center items-center py-4">
+          <div
+            className={`grid gap-x-20 ${
+              page ? "grid-cols-1 md:grid-cols-2" : "grid-cols-1 md:grid-cols-3"
+            }`}
+          >
+            {content.map((item, idx) => (
+              <ValueContainer key={idx} title={item.title} value={item.value} />
+            ))}
+          </div>
+        </div>
+
+        {/* Chart */}
+        <div className="bg-white shadow-md rounded-2xl p-6 ">
+          <div className="mb-4 flex flex-col md:flex-row justify-between items-center">
+            <h2 className="text-xl font-semibold mb-4">
+              Grafik {dataKey} Komoditas {selectedKomoditas} Bulan{" "}
+              {selectedBulan} Tahun {selectedTahun}
+            </h2>
             {dataGraph?.length > 0 ? (
-              <div style={{ width: "100%", height: 400 }}>
-                <Line
-                  ref={lineChartRef}
-                  data={chartData}
-                  options={chartOptions}
-                />
-              </div>
+              <>
+                <div className="flex gap-2">
+                  <button
+                    onClick={downloadLineChart}
+                    className="bg-[#FF9B00] hover:bg-[#FFC900] text-white px-4 w-fit py-2 rounded cursor-pointer"
+                  >
+                    <FaFileImage className="inline mr-1" /> Grafik
+                  </button>
+                  <button
+                    onClick={downloadLineCSV}
+                    className="bg-gray-700 text-white px-4 py-2 w-fit rounded cursor-pointer hover:bg-gray-800"
+                  >
+                    <FaFileCsv className="inline mr-1" /> Data CSV
+                  </button>
+                </div>
+              </>
             ) : (
               <p className="text-gray-400">Belum ada data yang ditampilkan.</p>
             )}
           </div>
-          {!page && ( // hanya tampilkan kalau di halaman utama
-            <div className="bg-white rounded-2xl p-6">
-              <TopAndilChart data={topAndil} title={selectedIndicator} />
+
+          {dataGraph?.length > 0 ? (
+            <div style={{ width: "100%", height: 400 }}>
+              <Line
+                ref={lineChartRef}
+                data={chartData}
+                options={chartOptions}
+              />
             </div>
+          ) : (
+            <p className="text-gray-400">Belum ada data yang ditampilkan.</p>
           )}
         </div>
-      )}
+        {!page && ( // hanya tampilkan kalau di halaman utama
+          <div className="bg-white rounded-2xl p-6">
+            <TopAndilChart data={topAndil} title={selectedIndicator} />
+          </div>
+        )}
+      </div>
+
+      <Footer />
     </div>
   );
 }
